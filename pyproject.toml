@@ -1,0 +1,19 @@
+[project]
+name = "breakout-agent"
+version = "1.0.0"
+requires-python = ">=3.13"
+description = "Python Poetry Environment for Breakout agent"
+authors = ["Malik Abdoul Hamidou <malik@abdoulhamidou.com>"]
+
+dependencies = [
+    "absl-py",
+    "gymnasium",
+    "numpy",
+    "pandas",
+    "protobuf",
+    "pygame",
+    "seaborn",
+    "tensorboard",
+    "torch",
+    "torch-tb-profiler"
+]
