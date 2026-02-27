@@ -11,7 +11,7 @@ FLAGS = flags.FLAGS
 FLAGS(sys.argv)
 
 env = FullEnv(isVisualised=True)
-agent = DQNAgent.load_model("models/260227_2250_DQNAgent/dqn.pt")
+agent = DQNAgent.load_model("models/260227_2303_DQNAgent")
 runner = Runner(
     agent=agent,
     env=env,

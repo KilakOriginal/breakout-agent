@@ -20,4 +20,4 @@ runner = Runner(
     save_model_each_episode_num=100,
     is_training=True)
 
-runner.run(1000)
+runner.run(2000)

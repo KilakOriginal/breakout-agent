@@ -38,7 +38,7 @@ class Runner:
             self.agent.save_model(self.models_path)
         # print score
         self.total_score += self.episodic_score
-        print(f"Finished episode {self.episode}, episodic score {self.episodic_score}, total score {self.total_score} ")
+        print(f"Finished episode {self.episode}, episodic score {self.episodic_score}, total score {self.total_score}, average score {self.total_score / self.episode:.2f}")
         self.episode += 1
         self.episodic_score = 0
 

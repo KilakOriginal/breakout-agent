@@ -68,12 +68,12 @@ class DQNAgent(AbstractAgent):
     DQN RL agent
     """
     def __init__(self, state_shape, action_shape,
-                 batch_size=1024,
-                 learning_rate=0.001, 
+                 batch_size=128,
+                 learning_rate=1e-4,
                  discount_factor=0.99, 
                  epsilon=1.0,
-                 epsilon_decay=0.995,
-                 epsilon_min=0.1,
+                 epsilon_decay=0.999995,
+                 epsilon_min=0.05,
                  net_arch=[64, 64],
                  target_update_freq=4000,
                  online_update_freq = 10,
@@ -92,7 +92,7 @@ class DQNAgent(AbstractAgent):
         self.learn_after_steps = learn_after_steps
         self.step_count = 0
         self.state_dim = state_shape[0]
-        self.n_actions = int(action_shape)
+        self.n_actions = int(action_shape[0] if isinstance(action_shape, (tuple, list)) else action_shape)
 
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         print(f"Agent running on device: {self.device}")
@@ -101,7 +101,7 @@ class DQNAgent(AbstractAgent):
         self.target_dqn = DQN(self.state_dim, net_arch[0], net_arch[1], self.n_actions).to(self.device)
         self.target_dqn.load_state_dict(self.online_dqn.state_dict())
 
-        self.loss = nn.MSELoss()
+        self.loss = nn.SmoothL1Loss()
         self.optimizer = torch.optim.Adam(self.online_dqn.parameters(), lr=self.learning_rate)
 
         self.memory = ReplayMemory(memory_capacity, batch_size, self.state_dim, device=self.device)
@@ -119,7 +119,6 @@ class DQNAgent(AbstractAgent):
         return action
     
     def optimise(self, mini_batch):
-        # Unpack based on memory structure
         state_dim = self.state_dim
         
         states = mini_batch[:, :state_dim]
@@ -129,26 +128,24 @@ class DQNAgent(AbstractAgent):
         dones = mini_batch[:, -1]
 
         with torch.no_grad():
-            next_output = self.target_dqn(next_states)
+            # Double DQN target
+            next_actions = self.online_dqn(next_states).argmax(dim=1, keepdim=True)
+            next_q = self.target_dqn(next_states).gather(1, next_actions).squeeze(1)
+            target = rewards + self.discount_factor * next_q * (1 - dones)
 
-            target = torch.add(
-                input=rewards,
-                alpha=self.discount_factor,
-                other=torch.max(next_output, dim=1).values * (1 - dones)
-            )
-
-        output = self.online_dqn(states).gather(1, actions.unsqueeze(1)).squeeze()
+        output = self.online_dqn(states).gather(1, actions.unsqueeze(1)).squeeze(1)
         loss = self.loss(output, target)
 
         self.optimizer.zero_grad()
         loss.backward()
+        torch.nn.utils.clip_grad_norm_(self.online_dqn.parameters(), 10.0)
         self.optimizer.step()
 
     def update(self, state, action, reward, next_state, done):
         self.memory.add(state, action, reward, next_state, done)
 
-        if done:
-            self.epsilon = max(self.epsilon * self.epsilon_decay, self.epsilon_min)
+        # decay every step
+        self.epsilon = max(self.epsilon * self.epsilon_decay, self.epsilon_min)
 
         if self.step_count <= self.learn_after_steps or len(self.memory) < self.batch_size:
             return
@@ -170,9 +167,6 @@ class DQNAgent(AbstractAgent):
     def load_model(cls, path, filename="dqn.pt", reset_timesteps=False, load_memory=True):
         model_path = Path(path) / filename
         state_dict = torch.load(model_path)
-        # Instantiate with dummy shapes, relying on load_state_dict to fix weights
-        # Note: n_actions must match the saved model
-        # Assuming 3 actions for breakout
         agent = cls(state_shape=(5,), action_shape=3)
         agent.online_dqn.load_state_dict(state_dict)
         agent.target_dqn.load_state_dict(state_dict)
